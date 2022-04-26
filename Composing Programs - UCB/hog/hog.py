@@ -21,8 +21,12 @@ def roll_dice(num_rolls, dice=six_sided):
     # These assert statements ensure that num_rolls is a positive integer.
     assert type(num_rolls) == int, 'num_rolls must be an integer.'
     assert num_rolls > 0, 'Must roll at least once.'
-    "*** YOUR CODE HERE ***"
-
+    
+    roll_results = [dice() for _ in range(num_rolls)]
+    if 1 in roll_results: # Pig out rule
+        return 1
+    else:
+        return sum(roll_results)
 
 def take_turn(num_rolls, opponent_score, dice=six_sided):
     """Simulate a turn rolling NUM_ROLLS dice, which may be 0 (Free bacon).
@@ -35,7 +39,11 @@ def take_turn(num_rolls, opponent_score, dice=six_sided):
     assert num_rolls >= 0, 'Cannot roll a negative number of dice.'
     assert num_rolls <= 10, 'Cannot roll more than 10 dice.'
     assert opponent_score < 100, 'The game should be over.'
-    "*** YOUR CODE HERE ***"
+    
+    if num_rolls == 0: # Free bacon rule
+        return 1 + max(opponent_score // 10, opponent_score % 10)
+    else:
+        return roll_dice(num_rolls, dice)
 
 # Playing a game
 
@@ -50,7 +58,11 @@ def select_dice(score, opponent_score):
     >>> select_dice(0, 0) == four_sided
     True
     """
-    "*** YOUR CODE HERE ***"
+    if (score + opponent_score) % 7 == 0: # Hog wild rule
+        return four_sided
+    else:
+        return six_sided
+
 
 def other(who):
     """Return the other player, for a player WHO numbered 0 or 1.
@@ -75,7 +87,22 @@ def play(strategy0, strategy1, goal=GOAL_SCORE):
     """
     who = 0  # Which player is about to take a turn, 0 (first) or 1 (second)
     score, opponent_score = 0, 0
-    "*** YOUR CODE HERE ***"
+
+    while score < goal and opponent_score < goal:
+
+        if who == 0:
+            num_dice = strategy0(score, opponent_score)
+            type_dice = select_dice(score, opponent_score)
+            score += take_turn(num_dice, opponent_score, type_dice)
+        elif who == 1:
+            num_dice = strategy1(opponent_score, score)
+            type_dice = select_dice(opponent_score, score)
+            opponent_score += take_turn(num_dice, score, type_dice)
+
+        who = other(who)
+        if score == opponent_score * 2 or score * 2 == opponent_score: # Swine swap rule
+            score, opponent_score = opponent_score, score
+
     return score, opponent_score  # You may wish to change this line.
 
 #######################
@@ -124,7 +151,11 @@ def make_averaged(fn, num_samples=1000):
     - In the other, the player rolls a 5 and 6, scoring 11.
     Thus, the average value is 6.0.
     """
-    "*** YOUR CODE HERE ***"
+    def make_averaged_and_return(*args):
+        result = [fn(*args) for _ in range(num_samples)]
+        return sum(result) / len(result)
+
+    return make_averaged_and_return
 
 def max_scoring_num_rolls(dice=six_sided):
     """Return the number of dice (1 to 10) that gives the highest average turn
@@ -145,7 +176,16 @@ def max_scoring_num_rolls(dice=six_sided):
     10 dice scores 30.0 on average
     10
     """
-    "*** YOUR CODE HERE ***"
+    max_score = -1
+    max_dice = 0
+
+    for i in range(1, 11):
+        average_score = make_averaged(roll_dice, 1000)(i, dice)
+        if average_score >= max_score:
+            max_score, max_dice = average_score, i
+        print(f"{i} dice scores {average_score} on average")
+
+    print(max_dice)
 
 def winner(strategy0, strategy1):
     """Return 0 if strategy0 wins against strategy1, and 1 otherwise."""
@@ -196,8 +236,11 @@ def bacon_strategy(score, opponent_score):
     >>> bacon_strategy(50, 70)
     0
     """
-    "*** YOUR CODE HERE ***"
-    return 5 # Replace this statement
+    if take_turn(0, opponent_score) >= BACON_MARGIN:
+        return 0
+    else:
+        return BASELINE_NUM_ROLLS
+    
 
 def swap_strategy(score, opponent_score):
     """This strategy rolls 0 dice when it would result in a beneficial swap and
@@ -214,16 +257,26 @@ def swap_strategy(score, opponent_score):
     >>> swap_strategy(12, 12) # Baseline
     5
     """
-    "*** YOUR CODE HERE ***"
-    return 5 # Replace this statement
+    if (take_turn(0, opponent_score) + score) * 2 == opponent_score:
+        return 0
+    elif take_turn(0, opponent_score) + score == opponent_score * 2:
+        return BASELINE_NUM_ROLLS
+    else:
+        return bacon_strategy(score, opponent_score)
 
 def final_strategy(score, opponent_score):
     """Write a brief description of your final strategy.
 
     *** YOUR DESCRIPTION HERE ***
     """
-    "*** YOUR CODE HERE ***"
-    return 5 # Replace this statement
+    if (take_turn(0, opponent_score) + score) * 2 == opponent_score:
+        return 0
+    elif take_turn(0, opponent_score) + score == opponent_score * 2:
+        return BASELINE_NUM_ROLLS
+    elif take_turn(0, opponent_score) >= BACON_MARGIN:
+        return 0
+    else:
+        return 10
 
 
 ##########################
