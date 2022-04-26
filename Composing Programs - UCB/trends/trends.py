@@ -1,5 +1,6 @@
 """Visualizing Twitter Sentiment Across America"""
 
+from cmath import inf
 from data import word_sentiments, load_tweets
 from datetime import datetime
 from geo import us_states, geo_distance, make_position, longitude, latitude
@@ -37,15 +38,15 @@ def make_tweet(text, time, lat, lon):
 
 def tweet_text(tweet):
     """Return a string, the words in the text of a tweet."""
-    "*** YOUR CODE HERE ***"
+    return tweet['text']
 
 def tweet_time(tweet):
     """Return the datetime representing when a tweet was posted."""
-    "*** YOUR CODE HERE ***"
+    return tweet['time']
 
 def tweet_location(tweet):
     """Return a position representing a tweet's location."""
-    "*** YOUR CODE HERE ***"
+    return make_position(tweet['latitude'], tweet['longitude'])
 
 # The tweet abstract data type, implemented as a function.
 
@@ -60,8 +61,12 @@ def make_tweet_fn(text, time, lat, lon):
     >>> latitude(tweet_location_fn(t))
     38
     """
-    "*** YOUR CODE HERE ***"
-    # Please don't call make_tweet in your solution
+    contents = {'text': text, 'time': time, 'lat': lat, 'lon': lon}
+    def fn_selector(field):
+        nonlocal contents
+        return contents[field]
+
+    return fn_selector
 
 def tweet_text_fn(tweet):
     """Return a string, the words in the text of a functional tweet."""
@@ -101,8 +106,14 @@ def extract_words(text):
     >>> extract_words('@(cat$.on^#$my&@keyboard***@#*')
     ['cat', 'on', 'my', 'keyboard']
     """
-    "*** YOUR CODE HERE ***"
-    return text.split()  # Replace this line
+    words_filtered = "".join([ch if ch in ascii_letters else ' ' for ch in text]).split(' ')
+    
+    result = []
+    for word in words_filtered:
+        if len(word) > 0:
+            result.append(word)
+    return result
+
 
 def make_sentiment(value):
     """Return a sentiment, which represents a value that may not exist.
@@ -122,16 +133,22 @@ def make_sentiment(value):
     0
     """
     assert value is None or (value >= -1 and value <= 1), 'Illegal value'
-    "*** YOUR CODE HERE ***"
+    
+    sentiment = {'exist': False, 'numeric': 0}
+    if value is not None:
+        sentiment['exist'] = True
+        sentiment['numeric'] = value
+
+    return sentiment
 
 def has_sentiment(s):
     """Return whether sentiment s has a value."""
-    "*** YOUR CODE HERE ***"
+    return s['exist']
 
 def sentiment_value(s):
     """Return the value of a sentiment s."""
     assert has_sentiment(s), 'No sentiment value'
-    "*** YOUR CODE HERE ***"
+    return s['numeric']
 
 def get_word_sentiment(word):
     """Return a sentiment representing the degree of positive or negative
@@ -167,11 +184,18 @@ def analyze_tweet_sentiment(tweet):
     >>> has_sentiment(analyze_tweet_sentiment(no_sentiment))
     False
     """
-    # You may change any of the lines below.
+    words = extract_words(tweet_text(tweet))
+    sum_score, count = 0, 0
     average = make_sentiment(None)
-    "*** YOUR CODE HERE ***"
-    return average
 
+    for word in words:
+        if has_sentiment(get_word_sentiment(word)):
+            sum_score += sentiment_value(get_word_sentiment(word))
+            count += 1
+    if count > 0:
+        average = make_sentiment(sum_score / count)
+
+    return average
 
 #################################
 # Phase 2: The Geometry of Maps #
@@ -199,7 +223,31 @@ def find_centroid(polygon):
     >>> tuple(map(float, find_centroid([p1, p2, p1])))  # A zero-area polygon
     (1.0, 2.0, 0.0)
     """
-    "*** YOUR CODE HERE ***"
+    assert latitude(polygon[0]) == latitude(polygon[-1]) and longitude(polygon[0]) == longitude(polygon[-1])
+
+    sum_signed_area = 0
+    sum_cx = 0
+    sum_cy = 0
+    for i in range(len(polygon)):
+        xi = latitude(polygon[i])
+        yi = longitude(polygon[i])
+        ip1 = (i + 1) % len(polygon)
+        xip1 = latitude(polygon[ip1])
+        yip1 = longitude(polygon[ip1])
+        tmp = xi * yip1 - xip1 * yi
+        sum_signed_area += tmp
+        sum_cx += (xi + xip1) * tmp
+        sum_cy += (yi + yip1) * tmp
+    area = 0.5 * sum_signed_area
+
+    try:
+        cx = sum_cx / (6 * area)
+        cy = sum_cy / (6 * area)
+    except ZeroDivisionError:
+        return latitude(polygon[0]), longitude(polygon[0]), area
+
+    return cx, cy, abs(area)
+
 
 def find_state_center(polygons):
     """Compute the geographic center of a state, averaged over its polygons.
@@ -222,7 +270,21 @@ def find_state_center(polygons):
     >>> round(longitude(hi), 5)
     -156.21763
     """
-    "*** YOUR CODE HERE ***"
+    sum_area = 0
+    sum_cx = 0
+    sum_cy = 0
+
+    for polygon in polygons:
+        cx, cy, area = find_centroid(polygon)
+        sum_cx += area * cx
+        sum_cy += area * cy
+        sum_area += area
+    
+    if sum_area == 0:
+        cx, cy, _ = find_centroid(polygons[0])
+        return  make_position(cx, cy)
+
+    return make_position(sum_cx/sum_area, sum_cy/sum_area)
 
 
 ###################################
@@ -249,7 +311,26 @@ def group_tweets_by_state(tweets):
     '"welcome to san francisco" @ (38, -122)'
     """
     tweets_by_state = {}
-    "*** YOUR CODE HERE ***"
+    state_center = {}
+    for us_state in us_states:
+        state_center[us_state] = find_state_center(us_states[us_state])
+    
+    for tweet in tweets:
+        tweet_position = tweet_location(tweet)
+        if longitude(tweet_position) is None or latitude(tweet_position) is None:
+            continue
+        min_distance = inf
+        min_distance_state = None
+        for us_state in us_states:
+            distance = geo_distance(tweet_position, state_center[us_state])
+            if distance < min_distance:
+                min_distance = distance
+                min_distance_state = us_state
+
+        if min_distance_state not in tweets_by_state:
+            tweets_by_state[min_distance_state] = []
+        tweets_by_state[min_distance_state].append(tweet)
+
     return tweets_by_state
 
 def average_sentiments(tweets_by_state):
@@ -265,7 +346,14 @@ def average_sentiments(tweets_by_state):
     tweets_by_state -- A dictionary from state names to lists of tweets
     """
     averaged_state_sentiments = {}
-    "*** YOUR CODE HERE ***"
+    for us_state in tweets_by_state:
+        tweets = tweets_by_state[us_state]
+        tweet_sentiments = [analyze_tweet_sentiment(tweet) for tweet in tweets]
+        tweet_sentiments_filtered =  [_ for _ in tweet_sentiments if has_sentiment(_)]
+        if len(tweet_sentiments_filtered) == 0:
+            continue
+        averaged_state_sentiments[us_state] = sum([sentiment_value(_) for _ in tweet_sentiments_filtered]) / len(tweet_sentiments_filtered)
+        
     return averaged_state_sentiments
 
 
