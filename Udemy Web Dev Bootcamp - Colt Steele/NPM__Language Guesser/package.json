@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "dependencies": {
+    "franc": "^6.0.0",
+    "langs": "^2.0.0"
+  }
+}
