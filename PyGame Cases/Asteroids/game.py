@@ -1,5 +1,5 @@
 import pygame, sys, os, random, math
-from pygame.locals import *
+from pygame.locals import *  
 
 pygame.init()
 fps = pygame. time.Clock()
@@ -25,6 +25,8 @@ debris = pygame.image.load(os.path.join('images','debris2_brown.png'))
 ship = pygame.image.load(os.path.join('images','ship.png'))
 ship_thrusted = pygame.image.load(os.path.join('images','ship_thrusted.png'))
 asteroid = pygame.image.load(os.path.join('images','asteroid.png'))
+shot = pygame.image.load(os.path.join('images','shot2.png'))
+explosion = pygame.image.load(os.path.join('images','explosion_blue.png'))
 
 ship_x = WIDTH/2 - 50
 ship_y = HEIGHT/2 - 50
@@ -39,6 +41,14 @@ asteroid_y = [] #random.randint(0,HEIGHT)
 asteroid_angle = []
 asteroid_speed = 2
 no_asteroids = 5
+
+bullet_x = []
+bullet_y = []
+bullet_angle = []
+no_bullets = 0
+
+score = 0
+game_over = False
 
 for i in range(0,no_asteroids):
     asteroid_x.append( random.randint(0,WIDTH) )
@@ -58,11 +68,17 @@ def rot_center(image, angle):
 # draw game function
 def draw(canvas):
     global time
+    global ship_is_forward
+    global bullet_x, bullet_y
+    global score
     canvas.fill(BLACK)
     canvas.blit(bg,(0,0))
     canvas.blit(debris,(time*.3,0))
     canvas.blit(debris,(time*.3-WIDTH,0))
     time = time + 1
+
+    for i in range(0,no_bullets):
+        canvas.blit(shot, (bullet_x[i],bullet_y[i]) )
 
     for i in range(0,no_asteroids):
         canvas.blit( rot_center(asteroid,time) ,(asteroid_x[i],asteroid_y[i]))
@@ -72,10 +88,22 @@ def draw(canvas):
     else:
         canvas.blit( rot_center(ship,ship_angle) , (ship_x, ship_y))
 
+    #draw Score
+    myfont1 = pygame.font.SysFont("Comic Sans MS", 40)
+    label1 = myfont1.render("Score : "+str(score), 1, (255,255,0))
+    canvas.blit(label1, (50,20))
+
+    if game_over:
+        myfont2 = pygame.font.SysFont("Comic Sans MS", 80)
+        label2 = myfont2.render("GAME OVER ", 1, (255,255,255))
+        canvas.blit(label2, (WIDTH/2 -150,HEIGHT/2 - 40))
+
 # handle input function
 def handle_input():
     global ship_angle, ship_is_rotating, ship_direction
     global ship_x, ship_y, ship_speed, ship_is_forward
+    global bullet_x, bullet_y, bullet_angle, no_bullets
+    global thruster_sound, missile_sound
 
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -91,6 +119,11 @@ def handle_input():
             elif event.key == K_UP:
                 ship_is_forward = True
                 ship_speed = 10
+            elif event.key == K_SPACE:
+                bullet_x.append( ship_x + 50 )
+                bullet_y.append( ship_y + 50 )
+                bullet_angle.append( ship_angle )
+                no_bullets = no_bullets + 1
 
         elif event.type == KEYUP:
             if event.key == K_LEFT or event.key == K_RIGHT:
@@ -110,19 +143,61 @@ def handle_input():
         if ship_is_forward == False:
             ship_speed = ship_speed - 0.2
 
+# update the screen
 def update_screen():
     pygame.display.update()
     fps.tick(60)
 
+def isCollision(enemyX, enemyY, bulletX, bulletY, dist):
+    distance = math.sqrt(math.pow(enemyX - bulletX, 2) + (math.pow(enemyY - bulletY, 2)))
+    if distance < dist:
+        return True
+    else:
+        return False
+
+
 def game_logic():
-    for i in range(0, no_asteroids):
+   global bullet_x, bullet_y, bullet_angle, no_bullets
+   global asteroid_x, asteroid_y
+   global score
+   global game_over
+
+   for i in range(0, no_bullets):
+       bullet_x[i] = (bullet_x[i] + math.cos(math.radians(bullet_angle[i]))*10 )
+       bullet_y[i] = (bullet_y[i] + -math.sin(math.radians(bullet_angle[i]))*10 )
+
+   for i in range(0,no_asteroids):
         asteroid_x[i] = (asteroid_x[i] + math.cos(math.radians(asteroid_angle[i]))*asteroid_speed )
-        asteroid_y[i] = (asteroid_y[i] + -math.sin(math.radians(asteroid_angle[i]))*asteroid_speed )
+        asteroid_y[i] = (asteroid_y[i] + -math.sin(math.radians(asteroid_angle[i]))*asteroid_speed )    
+
+        if asteroid_y[i] < 0:
+            asteroid_y[i] = HEIGHT
+
+        if asteroid_y[i] > HEIGHT:
+            asteroid_y[i] = 0
+
+        if asteroid_x[i] < 0:
+            asteroid_x[i] = WIDTH
+
+        if asteroid_x[i] > WIDTH:
+            asteroid_x[i] = 0
+
+        if isCollision(ship_x, ship_y, asteroid_x[i], asteroid_y[i], 27):
+            game_over = True
+
+   for i in range(0, no_bullets):
+        for j in range(0, no_asteroids):
+            if isCollision(bullet_x[i], bullet_y[i], asteroid_x[j], asteroid_y[j], 50):
+               asteroid_x[j] = ( random.randint(0,WIDTH) )
+               asteroid_y[j] = ( random.randint(0,HEIGHT) )
+               asteroid_angle[j] = ( random.randint(0,365) )
+               score = score + 1
 
 
 # asteroids game loop
 while True:
     draw(window)
     handle_input()
-    game_logic()
+    if not game_over:
+        game_logic()
     update_screen()
