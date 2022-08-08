@@ -23,6 +23,8 @@ pygame.display.set_caption('Asteroids')
 bg = pygame.image.load(os.path.join('images','bg.jpg'))
 debris = pygame.image.load(os.path.join('images','debris2_brown.png'))
 ship = pygame.image.load(os.path.join('images','ship.png'))
+ship_thrusted = pygame.image.load(os.path.join('images','ship_thrusted.png'))
+asteroid = pygame.image.load(os.path.join('images','asteroid.png'))
 
 ship_x = WIDTH/2 - 50
 ship_y = HEIGHT/2 - 50
@@ -31,6 +33,17 @@ ship_is_rotating = False
 ship_is_forward = False
 ship_direction = 0
 ship_speed = 0
+
+asteroid_x = [] #random.randint(0,WIDTH)
+asteroid_y = [] #random.randint(0,HEIGHT)
+asteroid_angle = []
+asteroid_speed = 2
+no_asteroids = 5
+
+for i in range(0,no_asteroids):
+    asteroid_x.append( random.randint(0,WIDTH) )
+    asteroid_y.append( random.randint(0,HEIGHT) )
+    asteroid_angle.append( random. randint(0, 360) )
 
 def rot_center(image, angle):
     """rotate image with some degress"""
@@ -51,7 +64,13 @@ def draw(canvas):
     canvas.blit(debris,(time*.3-WIDTH,0))
     time = time + 1
 
-    canvas.blit(rot_center(ship, ship_angle), (ship_x, ship_y))
+    for i in range(0,no_asteroids):
+        canvas.blit( rot_center(asteroid,time) ,(asteroid_x[i],asteroid_y[i]))
+
+    if ship_is_forward:
+        canvas.blit( rot_center(ship_thrusted,ship_angle) , (ship_x, ship_y))
+    else:
+        canvas.blit( rot_center(ship,ship_angle) , (ship_x, ship_y))
 
 # handle input function
 def handle_input():
@@ -79,8 +98,6 @@ def handle_input():
             else:
                 ship_is_forward = False
 
-        print(ship_angle)
-
     if ship_is_rotating:
         if ship_direction == 0:
             ship_angle = ship_angle - 10    
@@ -97,9 +114,15 @@ def update_screen():
     pygame.display.update()
     fps.tick(60)
 
+def game_logic():
+    for i in range(0, no_asteroids):
+        asteroid_x[i] = (asteroid_x[i] + math.cos(math.radians(asteroid_angle[i]))*asteroid_speed )
+        asteroid_y[i] = (asteroid_y[i] + -math.sin(math.radians(asteroid_angle[i]))*asteroid_speed )
+
+
 # asteroids game loop
 while True:
     draw(window)
     handle_input()
-    # game_logic()
+    game_logic()
     update_screen()
