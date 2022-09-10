@@ -56,7 +56,7 @@ for i in range(0,no_asteroids):
     asteroid_angle.append( random. randint(0, 360) )
 
 def rot_center(image, angle):
-    """rotate image with some degress"""
+    """rotate image with some degrees"""
 
     orig_rect = image.get_rect()
     rot_image = pygame.transform.rotate(image, angle)
